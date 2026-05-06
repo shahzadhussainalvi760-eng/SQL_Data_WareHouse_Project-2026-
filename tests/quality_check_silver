@@ -1,1 +1,195 @@
+*
+====================================================================================================
+Quality Checks
+====================================================================================================
+
+Script Purpose:
+This script performs various quality checks for data consistency, accuracy, 
+and standardization across the 'silver' schemas. It includes checks for:
+- Null or duplicate primary keys.
+- Unwanted spaces in string fields.
+- Data standardization and consistency.
+- Invalid date ranges and orders.
+- Data consistency between related fields.
+
+Usage Notes:
+- Run these checks after data loading Silver Layer.
+- Investigate and resolve any discrepancies found during the checks.
+
+-- Checking 'silver_crm_cust_info'
+-- Check for NULLs or Duplicates in Primary Key
+-- Expectation: No Results 
+
+SELECT * FROM silver.crm_cust_info;
+
+SELECT cst_id ,
+	COUNT(*)
+FROM silver.crm_cust_info
+--WHERE cst_id  IS NULL;
+GROUP BY cst_id
+HAVING COUNT(*) >1
+;
+
+-- Check for Unwanted Spaces
+-- Expectation: No Results
+--For cst_firstname 
+SELECT cst_firstname
+FROM silver.crm_cust_info c
+WHERE cst_firstname != TRIM(cst_firstname);
+
+--For cst_lastname
+SELECT cst_lastname
+FROM silver.crm_cust_info c
+WHERE cst_lastname != TRIM(cst_lastname);
+
+--For cst_gender
+SELECT bc.cst_gndr
+FROM silver.crm_cust_info bc
+WHERE bc.cst_gndr != TRIM(bc.cst_gndr)
+
+--- Data Standardization & Consistency
+SELECT DISTINCT bc.cst_gndr
+FROM silver.crm_cust_info bc;
+
+SELECT DISTINCT bc.cst_material_status
+FROM silver.crm_cust_info bc;
+---====================================================
+-- Checking 'silver_crm_prd_info'
+-- Check for NULLs or Duplicates in Primary Key
+-- Expectation: No Results
+
+
+SELECT  p.prd_id,
+	COUNT(*)
+FROM silver.crm_prd_info p
+--WHERE p.prd_id  IS NULL;
+GROUP BY prd_id
+HAVING COUNT(*) >1 OR p.prd_id  IS  NULL
+
+-- Check for Unwanted Spaces
+-- Expectation: No Results
+SELECT *
+FROM silver.crm_prd_info
+WHERE prd_nm != TRIM(prd_nm);
+
+-- Check for NULLs or Negative Values in Cost
+-- Expectation: No Results
+SELECT *
+FROM silver_crm_prd_info
+WHERE prd_cost < 0 OR prd_cost IS NULL;
+;
+---===============================================================================
+-- Checking 'silver_crm_sales_details'
+-- Check for Invalid Dates
+-- Expectation: No Invalid Dates
+SELECT
+NULLIF(sls_due_dt, 0) AS sls_due_dt
+FROM silver_crm_sales_details
+WHERE sls_due_dt <> 0
+OR LEN(sls_due_dt) != 8
+OR sls_due_dt < 20000101
+OR sls_due_dt > 20500101;
+--------------
+-- Check Data Consistency: Sales = Quantity * Price
+-- Expectation: No Results
+SELECT DISTINCT
+sls_sales,
+sls_quantity,
+sls_price
+FROM silver_crm_sales_details
+WHERE sls_sales != sls_quantity * sls_price
+OR sls_sales IS NULL
+OR sls_quantity IS NULL
+OR sls_price IS NULL
+OR sls_sales < 0
+OR sls_quantity < 0
+OR sls_price < 0
+ORDER BY sls_sales, sls_quantity, sls_price;
+-------
+-- Checking 'silver_crm_sales_details'
+-- Check for Invalid Dates
+-- Expectation: No Invalid Dates
+SELECT
+NULLIF(sls_due_dt, 0) AS sls_due_dt
+FROM silver_crm_sales_details
+WHERE sls_due_dt <> 0
+OR LEN(sls_due_dt) != 8
+OR sls_due_dt < 20000101
+OR sls_due_dt > 20500101;
+
+-- Check for Invalid Date Orders (Order Date > Shipping/Due Dates)
+-- Expectation: No Results
+SELECT *
+FROM silver_crm_sales_details
+...
+
+--===========================================================================
+-- Checking 'silver.erp_loc_a101'
+SELECT CID
+FROM silver.erp_loc_a101;
+
+--- Data Standaradization and & Consistensisy
+SELECT DISTINCT
+	CNTRY 
+FROM silver.erp_loc_a101
+ORDER BY CNTRY
+===================================================================
+-- Checking 'silver_erp_px_cat_g1v2'
+-- Check for Unwanted Spaces
+-- Expectation: No Results
+SELECT
+	CAT,
+	SUBCAT,
+	MAINTENANCE
+FROM silver.erp_px_cat_g1v2
+WHERE CAT != TRIM(CAT) AND SUBCAT != TRIM(SUBCAT ) OR MAINTENANCE != TRIM(MAINTENANCE)
+
+-- DATA Standaradization and Consistency 
+SELECT DISTINCT
+	CAT
+FROM silver.erp_px_cat_g1v2
+
+--
+SELECT DISTINCT
+	SUBCAT
+FROM silver.erp_px_cat_g1v2
+--
+SELECT DISTINCT
+	MAINTENANCE
+FROM silver.erp_px_cat_g1v2
+
+--=====================================================================
+---
+--- check cid from silver.erp_cust_az12
+SELECT 
+	CID,
+	CASE
+		WHEN CID LIKE 'NAS%' THEN SUBSTRING(CID,4,LEN(CID))
+		ELSE CID
+		END ,
+	BDATE,
+	GEN
+FROM silver.erp_cust_az12
+WHERE 
+	CASE
+		WHEN CID LIKE 'NAS%' THEN SUBSTRING(CID,4,LEN(CID))
+		ELSE CID
+		END NOT IN (SELECT DISTINCT cst_key FROM silver.crm_cust_info s)
+
+SELECT * FROM silver.crm_cust_info
+
+---identity out of range
+---check very old customer
+--- Check birth date in future 
+SELECT BDATE
+FROM silver.erp_cust_az12
+WHERE  BDATE > GETDATE() OR BDATE < '1924-01-01'
+
+
+--- Data Standaradize and Consistency 
+SELECT DISTINCT
+	GEN
+	
+FROM silver.erp_cust_az12
+--===================================================================
 
